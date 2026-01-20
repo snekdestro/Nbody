@@ -3,7 +3,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(template)
+project(template LANGUAGES CXX CUDA)
 
 add_subdirectory("lib/glfw")
 find_package(OpenGL REQUIRED)
@@ -17,7 +17,10 @@ include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/lib/imgui
 )
 
-file(GLOB_RECURSE SRC_FILES src/*.cpp)
+file(GLOB_RECURSE SRC_FILES 
+	src/*.cpp
+	src/*.cu
+)
 add_executable(${CMAKE_PROJECT_NAME}
 	${SRC_FILES}
 

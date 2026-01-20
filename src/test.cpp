@@ -1,3 +1,5 @@
+/*
+
 #include <imgui/imgui.h>
 #include <imgui/backends/imgui_impl_glfw.h>
 #include <imgui/backends/imgui_impl_opengl3.h>
@@ -19,7 +21,7 @@ float r = (float)WINDOW_WIDTH / WINDOW_HEIGHT;
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void process_input(GLFWwindow* window);
 
-int main() {
+int pp() {
 	float vertices[] = {
 		 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,   // top right
 		 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,   // bottom right
@@ -135,3 +137,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	WINDOW_WIDTH = width;
 	WINDOW_HEIGHT = height;
 }
+
+
+*/
