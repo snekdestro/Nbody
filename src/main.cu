@@ -36,9 +36,9 @@ int main(int argc, char const *argv[])
     srand(static_cast<unsigned int>(time(nullptr)));
     for(int i =0; i < N; i++){
         x[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
-        y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f  );
-        vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f) * 10.0f;
-        vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f) * 10.0f;
+        y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
+        vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
+        vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
         //std::printf("%f, %f\n", x[i],y[i]); //debug print
 
         m[i] = 1.0;
@@ -171,6 +171,7 @@ int main(int argc, char const *argv[])
     float lastFrame = 0.0f;
    
     while (!glfwWindowShouldClose(window)) {
+        cudaMemset(ge, 0, 2 * sizeof(float));
         glfwGetCursorPos(window, &xpos, &ypos);
 
         float* d_ptr;
@@ -192,7 +193,7 @@ int main(int argc, char const *argv[])
         cudaGraphicsUnmapResources(1, &cuda_vbo_resource, 0);
         cudaMemcpy(c_g_field, ge, 2 * sizeof(float), cudaMemcpyDeviceToHost);
 
-        cudaMemset(ge, 0, 2 * sizeof(float));
+  
         line_vertices[2] = m_x + c_g_field[0];
         line_vertices[3] = m_y + c_g_field[1];
         float currentFrame = glfwGetTime();

@@ -46,7 +46,7 @@ __global__ void Body::compute_gravity(float* x, float* y, float* m, float* ax, f
             float dy = sh_y[j] - my_y;
             float dist_sq = dx * dx + dy * dy + 1e-9f;
             float inv_dist = rsqrtf(dist_sq);
-            float s = sh_m[j] * inv_dist * inv_dist * inv_dist * 1e-7f; 
+            float s = sh_m[j] * inv_dist * inv_dist * inv_dist ; 
             fx += dx * s;
             fy += dy * s;
         }
@@ -102,15 +102,21 @@ __global__ void Body::compute_electric(float* x, float* y, float* m,float* q, fl
 __global__ void Body::move(float* d_ptr, float* x, float* y, float* ax, float* ay, float* vx, float* vy, int n, float dt){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < n){
-        d_ptr[i * 5] = d_ptr[i * 5] + vx[i] * dt + 0.5f * ax[i] * dt * dt; 
-        d_ptr[i * 5 + 1] = d_ptr[i * 5 + 1] + vy[i] * dt + 0.5f * ay[i] * dt * dt; 
-        x[i * 5] = d_ptr[i * 5];
-        y[i * 5 ] = d_ptr[i * 5 + 1];
-        d_ptr[i * 5 + 2] = sqrtf(vx[i] * vx[i] + vy[i] * vy[i]); // Red
-        d_ptr[i * 5 + 3] = 0.5f;         // Green
-        d_ptr[i * 5 + 4] = 1.0f;         // Blue
+        d_ptr[i * 5] = x[i] + vx[i] * dt + 0.5f * ax[i] * dt * dt; 
+        d_ptr[i * 5 + 1] = y[i] + vy[i] * dt + 0.5f * ay[i] * dt * dt; 
+        x[i] = d_ptr[i * 5];
+        y[i] = d_ptr[i * 5 + 1];
         vx[i] += ax[i] * dt;
         vy[i] += ay[i] * dt;
+        float deg = atan2f(vx[i],vy[i]);
+        //d_ptr[i * 5 + 2] = sin(deg);
+        //d_ptr[i * 5 + 3] = sin(deg + 2.0f * 3.141592653589f  / 3.0f);
+        //d_ptr[i * 5 + 4] = sin(deg + 4.0f * 3.141592653589f  / 3.0f);
+        //needs smoothing
+        d_ptr[i * 5  +2] = 1 - powf(1.01f, -(vx[i] * vx[i] + vy[i] * vy[i]));
+        d_ptr[i * 5 + 3] = 0.0f;
+        d_ptr[i * 5 + 4] =  powf(1.01f, -(vx[i] * vx[i] + vy[i] * vy[i]));
+        
     }
 }
 
@@ -123,7 +129,7 @@ __global__ void Body::compute_gfield(float* x, float* y, float* m, float p_x, fl
             float dy = y[i] - p_y;
             float dist_sq = dx * dx + dy * dy + 1e-9f;
             float invdist = rsqrt(dist_sq);
-            float s = invdist * invdist * invdist * 1e-7f;
+            float s = invdist * invdist * invdist * 1e-6f * m[i];
             lx += dx * s;
             ly += dy * s;
 
