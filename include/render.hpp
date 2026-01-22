@@ -1,0 +1,2 @@
+int renderG();
+int renderE();

@@ -1,22 +1,8 @@
-#include "particle.h"
+#include "particle.cuh"
 #include <cmath>
 using namespace Body;
 
 
-
-void G_particle::calc(G_particle other){
-    float r = std::sqrt((other.x - x) * (other.x - x) + (other.y - y) * (other.y - y));
-    a_x += (other.x - x) / (r * r * r); 
-    a_y += (other.y - y) / (r * r * r); 
-
-}
-
-void G_particle::move(float dt){
-    x += v_x * dt + 0.5f * a_x * dt * dt;
-    y += v_y * dt + 0.5f * a_y * dt * dt;
-    a_x = 0.0f;
-    a_y = 0.0f;
-}
 __global__ void Body::compute_gravity(float* x, float* y, float* m, float* ax, float* ay, int n){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     float my_x = (i < n) ? x[i] : 0.0f;
@@ -57,7 +43,7 @@ __global__ void Body::compute_gravity(float* x, float* y, float* m, float* ax, f
         ay[i] = fy;
     }
 }
-__global__ void Body::compute_electric(float* x, float* y, float* m,float* q, float* ax, float* ay, int n){
+__global__ void Body::compute_electric(float* x, float* y,float* q, float* ax, float* ay, int n){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     float my_x = (i < n) ? x[i] : 0.0f;
     float my_y = (i < n) ? y[i] : 0.0f;
@@ -87,7 +73,7 @@ __global__ void Body::compute_electric(float* x, float* y, float* m,float* q, fl
             float dy = sh_y[j] - my_y;
             float dist_sq = dx * dx + dy * dy + 1e-9f;
             float inv_dist = rsqrtf(dist_sq);
-            float s = inv_dist * inv_dist * inv_dist * 1e-7f; 
+            float s = inv_dist * inv_dist * inv_dist ; 
             fx += dx * s * qq;
             fy += dy * s * qq;
         }
@@ -153,6 +139,34 @@ __global__ void Body::compute_gfield(float* x, float* y, float* m, float p_x, fl
 }
 
 __global__ void Body::compute_efield(float* x, float* y, float* q, float p_x, float p_y, int n,float* output){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+        float lx =0.0f;
+        float ly =0.0f;
+        if(i < n){
+            float dx = x[i] - p_x;
+            float dy = y[i] - p_y;
+            float dist_sq = dx * dx + dy * dy + 1e-9f;
+            float invdist = rsqrt(dist_sq);
+            float s = invdist * invdist * invdist * 1e-6f * q[i];
+            lx += dx * s;
+            ly += dy * s;
 
+        }
+        __shared__ float fx[256];
+        __shared__ float fy[256];
+        fx[threadIdx.x] = lx;
+        fy[threadIdx.x] = ly;
+        __syncthreads();
+        for(unsigned int it = blockDim.x / 2; it > 0; it >>= 1){
+            if(threadIdx.x < it){
+                fx[threadIdx.x] += fx[threadIdx.x + it];
+                fy[threadIdx.x] += fy[threadIdx.x + it];
+            }
+            __syncthreads();
+        }
+        if(threadIdx.x == 0){
+            atomicAdd(&output[0], fx[0]);
+            atomicAdd(&output[1], fy[0]);
+        }
 }
 
