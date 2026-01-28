@@ -1,16 +1,16 @@
-#include <particle.cuh>
-#include <glad/glad.h>
-#include <gl/GL.h>
-#include <GLFW/glfw3.h>
-#include <cuda_gl_interop.h>
-#include <iostream>
-#include <vector>
-
 #include <render.hpp>
 
 int main(int argc, char const *argv[])
 {   
-    return renderE();
+    if(argc >= 2){
+        if(argv[1][0] == 'g'){
+            return renderG();
+        }
+        else if(argv[1][0] == 'e'){
+            return renderE();
+        }
+    }
+    return 0;
     
 }
 

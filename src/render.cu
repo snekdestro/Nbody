@@ -3,7 +3,6 @@
 #include <gl/GL.h>
 #include <GLFW/glfw3.h>
 #include <cuda_gl_interop.h>
-#include <iostream>
 #include <vector>
 #include <render.hpp>
 
@@ -50,7 +49,6 @@ int renderG()
         y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
         vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
         vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
-        //std::printf("%f, %f\n", x[i],y[i]); //debug print
 
         m[i] = 1.0;
     }
@@ -72,8 +70,6 @@ int renderG()
     cudaMemcpy(d_vx, &vx[0], N * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_vy, &vy[0], N * sizeof(float), cudaMemcpyHostToDevice);
     
-    //cudaMemset(d_vx, 0, N * sizeof(float));
-    //cudaMemset(d_vy, 0, N * sizeof(float));
     cudaMemset(d_ax, 0, N * sizeof(float));
     cudaMemset(d_ay, 0, N * sizeof(float));
     unsigned int VAO, VBO, EBO;
@@ -210,9 +206,7 @@ int renderG()
         float currentFrame = glfwGetTime();
         dt = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        //std::printf("%f\n", 1/dt);
         glClear(GL_COLOR_BUFFER_BIT); // Clear the previous frame
-        //std::printf("%f, %f\n", c_g_field[0], c_g_field[1]);
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
         glUseProgram(shaderProgram); 
         glBindVertexArray(VAO);
@@ -273,7 +267,6 @@ int renderE()
         y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
         vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
         vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
-        //std::printf("%f, %f\n", x[i],y[i]); //debug print
         q[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
 
     }
@@ -433,9 +426,7 @@ int renderE()
         float currentFrame = glfwGetTime();
         dt = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        //std::printf("%f\n", 1/dt);
         glClear(GL_COLOR_BUFFER_BIT); // Clear the previous frame
-        //std::printf("%f, %f\n", c_g_field[0], c_g_field[1]);
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
         glUseProgram(shaderProgram); 
         glBindVertexArray(VAO);
