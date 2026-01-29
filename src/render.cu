@@ -52,7 +52,7 @@ int renderG(const int N,const float soft)
         y[i] = rad * sin(angle);
         vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f) - 12.0f);
         vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f) - 12.0f);
-        m[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f));
+        m[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f)) + 1.0f;
     }
     float *d_x, *d_y, *d_vx, *d_vy, *d_ax, *d_ay, *d_m, *ge;
     float* c_g_field = (float*)std::malloc(2 * sizeof(float));
@@ -84,29 +84,32 @@ int renderG(const int N,const float soft)
     glGenBuffers(1, &VBO);
  
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, N * 5 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, N * 6 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     
 
 
     
     // Attribute 0: Position (x, y)
-    // Stride is 5 * sizeof(float) because each particle's data repeats every 5 floats
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
     // Attribute 1: Color (r, g, b)
     // This starts at an offset of 2 floats (skipping x and y)
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(2 * sizeof(float)));
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(5*sizeof(float)));
     glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+    glEnable(GL_PROGRAM_POINT_SIZE);
     // Register Buffer with CUDA
     cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, VBO, cudaGraphicsMapFlagsWriteDiscard);
     const char* vertexShaderSource = "#version 330 core\n"
         "layout (location = 0) in vec2 aPos;\n"
         "layout (location = 1) in vec3 aColor;\n"
+        "layout (location = 2) in float mass;\n"
         "out vec3 vColor;\n"
         "void main() {\n"
         "   gl_Position = vec4(aPos, 0.0, 1.0);\n"
-        "   gl_PointSize = 10.0;\n"
+        "   gl_PointSize = mass/5;\n"
         "   vColor = aColor;\n"
         "}\0";
 
@@ -114,6 +117,10 @@ int renderG(const int N,const float soft)
         "in vec3 vColor;\n"
         "out vec4 FragColor;\n"
         "void main() {\n"
+        "    vec2 circCoord = gl_PointCoord - vec2(0.5);\n"
+        "    if (dot(circCoord, circCoord) > 0.25) {\n"
+        "        discard;\n"
+        "    }\n"
         "   FragColor = vec4(vColor, 1.0);\n"
         "}\n\0";
 
@@ -193,7 +200,7 @@ int renderG(const int N,const float soft)
         
 
         Body::compute_gravity<<<blocks, threads>>>(d_x, d_y, d_m, d_ax, d_ay, N,soft);
-        Body::move<<<blocks, threads>>>(d_ptr ,d_x , d_y , d_ax, d_ay, d_vx, d_vy, N, 0.00001f); 
+        Body::move<<<blocks, threads>>>(d_ptr ,d_x , d_y , d_ax, d_ay, d_vx, d_vy, N, 0.00001f,d_m); 
         Body::compute_gfield<<<blocks, threads>>>(d_x,d_y, d_m, m_x,m_y, N, ge,soft);
         line_vertices[0] = m_x;
         line_vertices[1] = m_y;
@@ -269,7 +276,7 @@ int renderE(const int N,const float soft)
         y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
         vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
         vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
-        q[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f ) * 5.f;
+        q[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f ) * 10.0f;
 
     }
     float *d_x, *d_y, *d_vx, *d_vy, *d_ax, *d_ay, *d_q, *ee;
@@ -304,28 +311,32 @@ int renderE(const int N,const float soft)
     glGenBuffers(1, &VBO);
  
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, N * 5 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, N * 6 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     
 
 
     
     // Attribute 0: Position (x, y)
     // Stride is 5 * sizeof(float) because each particle's data repeats every 5 floats
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
     // Attribute 1: Color (r, g, b)
     // This starts at an offset of 2 floats (skipping x and y)
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(5*sizeof(float)));
+    glEnableVertexAttribArray(2);
     cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, VBO, cudaGraphicsMapFlagsWriteDiscard);
+    glEnable(GL_PROGRAM_POINT_SIZE);
     const char* vertexShaderSource = "#version 330 core\n"
         "layout (location = 0) in vec2 aPos;\n"
         "layout (location = 1) in vec3 aColor;\n"
+        "layout (location = 2) in float charge;\n"
         "out vec3 vColor;\n"
         "void main() {\n"
         "   gl_Position = vec4(aPos, 0.0, 1.0);\n"
-        "   gl_PointSize = 10.0;\n"
+        "   gl_PointSize = abs(charge)/2.0;\n"
         "   vColor = aColor;\n"
         "}\0";
 
@@ -333,6 +344,10 @@ int renderE(const int N,const float soft)
         "in vec3 vColor;\n"
         "out vec4 FragColor;\n"
         "void main() {\n"
+        "    vec2 circCoord = gl_PointCoord - vec2(0.5);\n"
+        "    if (dot(circCoord, circCoord) > 0.25) {\n"
+        "        discard;\n"
+        "    }\n"
         "   FragColor = vec4(vColor, 1.0);\n"
         "}\n\0";
 
@@ -412,7 +427,7 @@ int renderE(const int N,const float soft)
         
 
         Body::compute_electric<<<blocks, threads>>>(d_x, d_y, d_q, d_ax, d_ay, N,soft);
-        Body::move<<<blocks, threads>>>(d_ptr ,d_x , d_y , d_ax, d_ay, d_vx, d_vy, N, 0.00001f); 
+        Body::move<<<blocks, threads>>>(d_ptr ,d_x , d_y , d_ax, d_ay, d_vx, d_vy, N, 0.00001f,d_q); 
         Body::compute_efield<<<blocks, threads>>>(d_x,d_y, d_q, m_x,m_y, N, ee,soft);
         line_vertices[0] = m_x;
         line_vertices[1] = m_y;

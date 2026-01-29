@@ -85,13 +85,13 @@ __global__ void Body::compute_electric(float* x, float* y,float* q, float* ax, f
     }
 }
 
-__global__ void Body::move(float* d_ptr, float* x, float* y, float* ax, float* ay, float* vx, float* vy, int n, float dt){
+__global__ void Body::move(float* d_ptr, float* x, float* y, float* ax, float* ay, float* vx, float* vy, int n, float dt,float* attrib){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < n){
-        d_ptr[i * 5] = x[i] + vx[i] * dt + 0.5f * ax[i] * dt * dt; 
-        d_ptr[i * 5 + 1] = y[i] + vy[i] * dt + 0.5f * ay[i] * dt * dt; 
-        x[i] = d_ptr[i * 5];
-        y[i] = d_ptr[i * 5 + 1];
+        d_ptr[i * 6] = x[i] + vx[i] * dt + 0.5f * ax[i] * dt * dt; 
+        d_ptr[i * 6 + 1] = y[i] + vy[i] * dt + 0.5f * ay[i] * dt * dt; 
+        x[i] = d_ptr[i * 6];
+        y[i] = d_ptr[i * 6 + 1];
         vx[i] += ax[i] * dt;
         vy[i] += ay[i] * dt;
         float deg = atan2f(vx[i],vy[i]);
@@ -99,10 +99,10 @@ __global__ void Body::move(float* d_ptr, float* x, float* y, float* ax, float* a
         //d_ptr[i * 5 + 3] = sin(deg + 2.0f * 3.141592653589f  / 3.0f);
         //d_ptr[i * 5 + 4] = sin(deg + 4.0f * 3.141592653589f  / 3.0f);
         //needs smoothing
-        d_ptr[i * 5  +2] = 1 - powf(1.01f, -(vx[i] * vx[i] + vy[i] * vy[i]));
-        d_ptr[i * 5 + 3] = 0.0f;
-        d_ptr[i * 5 + 4] =  powf(1.01f, -(vx[i] * vx[i] + vy[i] * vy[i]));
-        
+        d_ptr[i * 6  +2] = 0.5 - 0.5 *powf(1.00001f, -(vx[i] * vx[i] + vy[i] * vy[i]));
+        d_ptr[i * 6 + 3] = 0.0f;
+        d_ptr[i * 6 + 4] = powf(1.00001f, -(vx[i] * vx[i] + vy[i] * vy[i]));
+        d_ptr[i * 6 + 5] = attrib[i];
     }
 }
 
