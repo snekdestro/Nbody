@@ -3,7 +3,7 @@
 using namespace Body;
 
 
-__global__ void Body::compute_gravity(float* x, float* y, float* m, float* ax, float* ay, int n){
+__global__ void Body::compute_gravity(float* x, float* y, float* m, float* ax, float* ay, int n,float soft){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     float my_x = (i < n) ? x[i] : 0.0f;
     float my_y = (i < n) ? y[i] : 0.0f;
@@ -30,7 +30,7 @@ __global__ void Body::compute_gravity(float* x, float* y, float* m, float* ax, f
 
             float dx = sh_x[j] - my_x;
             float dy = sh_y[j] - my_y;
-            float dist_sq = dx * dx + dy * dy + 1e-9f;
+            float dist_sq = dx * dx + dy * dy + soft;
             float inv_dist = rsqrtf(dist_sq);
             float s = sh_m[j] * inv_dist * inv_dist * inv_dist ; 
             fx += dx * s;
@@ -43,7 +43,7 @@ __global__ void Body::compute_gravity(float* x, float* y, float* m, float* ax, f
         ay[i] = fy;
     }
 }
-__global__ void Body::compute_electric(float* x, float* y,float* q, float* ax, float* ay, int n){
+__global__ void Body::compute_electric(float* x, float* y,float* q, float* ax, float* ay, int n,float soft){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     float my_x = (i < n) ? x[i] : 0.0f;
     float my_y = (i < n) ? y[i] : 0.0f;
@@ -71,7 +71,7 @@ __global__ void Body::compute_electric(float* x, float* y,float* q, float* ax, f
             float qq = sh_q[j] * q_cur;
             float dx = sh_x[j] - my_x;
             float dy = sh_y[j] - my_y;
-            float dist_sq = dx * dx + dy * dy + 1e-9f;
+            float dist_sq = dx * dx + dy * dy + soft;
             float inv_dist = rsqrtf(dist_sq);
             float s = inv_dist * inv_dist * inv_dist ; 
             fx += dx * s * qq;
@@ -106,14 +106,14 @@ __global__ void Body::move(float* d_ptr, float* x, float* y, float* ax, float* a
     }
 }
 
-__global__ void Body::compute_gfield(float* x, float* y, float* m, float p_x, float p_y, int n,float* output){
+__global__ void Body::compute_gfield(float* x, float* y, float* m, float p_x, float p_y, int n,float* output,float soft){
         int i = blockIdx.x * blockDim.x + threadIdx.x;
         float lx =0.0f;
         float ly =0.0f;
         if(i < n){
             float dx = x[i] - p_x;
             float dy = y[i] - p_y;
-            float dist_sq = dx * dx + dy * dy + 1e-9f;
+            float dist_sq = dx * dx + dy * dy + soft;
             float invdist = rsqrt(dist_sq);
             float s = invdist * invdist * invdist * 1e-6f * m[i];
             lx += dx * s;
@@ -138,14 +138,14 @@ __global__ void Body::compute_gfield(float* x, float* y, float* m, float p_x, fl
         }
 }
 
-__global__ void Body::compute_efield(float* x, float* y, float* q, float p_x, float p_y, int n,float* output){
+__global__ void Body::compute_efield(float* x, float* y, float* q, float p_x, float p_y, int n,float* output,float soft){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
         float lx =0.0f;
         float ly =0.0f;
         if(i < n){
             float dx = x[i] - p_x;
             float dy = y[i] - p_y;
-            float dist_sq = dx * dx + dy * dy + 1e-9f;
+            float dist_sq = dx * dx + dy * dy + soft;
             float invdist = rsqrt(dist_sq);
             float s = invdist * invdist * invdist * 1e-6f * q[i];
             lx += dx * s;

@@ -19,7 +19,7 @@ void g_framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 }
 
 
-int renderG()
+int renderG(const int N,const float soft)
 {   
     
     
@@ -35,7 +35,6 @@ int renderG()
 	glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glfwSetFramebufferSizeCallback(window, g_framebuffer_size_callback);
-    const int N = 256 * 256 * 2;
     const int threads = 256;
     int blocks = (N + threads -1 )/ threads; 
     std::vector<float> x(N);
@@ -45,12 +44,15 @@ int renderG()
     std::vector<float> vy(N);
     srand(static_cast<unsigned int>(time(nullptr)));
     for(int i =0; i < N; i++){
-        x[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
-        y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
-        vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
-        vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
-
-        m[i] = 1.0;
+        //x[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
+        //y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
+        float angle = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /(3.1415926535f * 2.0f)) );
+        float rad = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
+        x[i] = rad * cos(angle);
+        y[i] = rad * sin(angle);
+        vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f) - 12.0f);
+        vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f) - 12.0f);
+        m[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f));
     }
     float *d_x, *d_y, *d_vx, *d_vy, *d_ax, *d_ay, *d_m, *ge;
     float* c_g_field = (float*)std::malloc(2 * sizeof(float));
@@ -72,7 +74,7 @@ int renderG()
     
     cudaMemset(d_ax, 0, N * sizeof(float));
     cudaMemset(d_ay, 0, N * sizeof(float));
-    unsigned int VAO, VBO, EBO;
+    unsigned int VAO, VBO;
     struct cudaGraphicsResource *cuda_vbo_resource;
     
     // Create OpenGL Buffer
@@ -190,9 +192,9 @@ int renderG()
         cudaGraphicsResourceGetMappedPointer((void**)&d_ptr, &size, cuda_vbo_resource);
         
 
-        Body::compute_gravity<<<blocks, threads>>>(d_x, d_y, d_m, d_ax, d_ay, N);
+        Body::compute_gravity<<<blocks, threads>>>(d_x, d_y, d_m, d_ax, d_ay, N,soft);
         Body::move<<<blocks, threads>>>(d_ptr ,d_x , d_y , d_ax, d_ay, d_vx, d_vy, N, 0.00001f); 
-        Body::compute_gfield<<<blocks, threads>>>(d_x,d_y, d_m, m_x,m_y, N, ge);
+        Body::compute_gfield<<<blocks, threads>>>(d_x,d_y, d_m, m_x,m_y, N, ge,soft);
         line_vertices[0] = m_x;
         line_vertices[1] = m_y;
         
@@ -224,6 +226,7 @@ int renderG()
         glBindVertexArray(VAO);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
+       //std::printf("%f\n", 1.0/dt);
 	}
 
     return 0;
@@ -242,7 +245,7 @@ void e_framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 }
 
 
-int renderE()
+int renderE(const int N,const float soft)
 {   
     glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -253,7 +256,6 @@ int renderE()
 	glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glfwSetFramebufferSizeCallback(window, e_framebuffer_size_callback);
-    const int N = 256 * 256 * 2;
     const int threads = 256;
     int blocks = (N + threads -1 )/ threads; 
     std::vector<float> x(N);
@@ -267,7 +269,7 @@ int renderE()
         y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
         vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
         vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
-        q[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
+        q[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f ) * 5.f;
 
     }
     float *d_x, *d_y, *d_vx, *d_vy, *d_ax, *d_ay, *d_q, *ee;
@@ -292,7 +294,7 @@ int renderE()
     //cudaMemset(d_vy, 0, N * sizeof(float));
     cudaMemset(d_ax, 0, N * sizeof(float));
     cudaMemset(d_ay, 0, N * sizeof(float));
-    unsigned int VAO, VBO, EBO;
+    unsigned int VAO, VBO;
     struct cudaGraphicsResource *cuda_vbo_resource;
     
     // Create OpenGL Buffer
@@ -316,7 +318,6 @@ int renderE()
     // This starts at an offset of 2 floats (skipping x and y)
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
-    // Register Buffer with CUDA
     cudaGraphicsGLRegisterBuffer(&cuda_vbo_resource, VBO, cudaGraphicsMapFlagsWriteDiscard);
     const char* vertexShaderSource = "#version 330 core\n"
         "layout (location = 0) in vec2 aPos;\n"
@@ -410,9 +411,9 @@ int renderE()
         cudaGraphicsResourceGetMappedPointer((void**)&d_ptr, &size, cuda_vbo_resource);
         
 
-        Body::compute_electric<<<blocks, threads>>>(d_x, d_y, d_q, d_ax, d_ay, N);
+        Body::compute_electric<<<blocks, threads>>>(d_x, d_y, d_q, d_ax, d_ay, N,soft);
         Body::move<<<blocks, threads>>>(d_ptr ,d_x , d_y , d_ax, d_ay, d_vx, d_vy, N, 0.00001f); 
-        Body::compute_efield<<<blocks, threads>>>(d_x,d_y, d_q, m_x,m_y, N, ee);
+        Body::compute_efield<<<blocks, threads>>>(d_x,d_y, d_q, m_x,m_y, N, ee,soft);
         line_vertices[0] = m_x;
         line_vertices[1] = m_y;
         
@@ -426,7 +427,7 @@ int renderE()
         float currentFrame = glfwGetTime();
         dt = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        glClear(GL_COLOR_BUFFER_BIT); // Clear the previous frame
+        glClear(GL_COLOR_BUFFER_BIT);
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
         glUseProgram(shaderProgram); 
         glBindVertexArray(VAO);
