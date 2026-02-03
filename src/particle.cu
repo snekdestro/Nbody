@@ -9,9 +9,9 @@ __global__ void Body::compute_gravity(float* x, float* y, float* m, float* ax, f
     float my_y = (i < n) ? y[i] : 0.0f;
     float fx = 0.0f;
     float fy = 0.0f;
-    __shared__ float sh_x[256];
-    __shared__ float sh_y[256];
-    __shared__ float sh_m[256];
+    __shared__ float sh_x[MAX_THREADS_PER_BLOCK];
+    __shared__ float sh_y[MAX_THREADS_PER_BLOCK];
+    __shared__ float sh_m[MAX_THREADS_PER_BLOCK];
     for(int tile = 0; tile < gridDim.x; tile++){
         int idx = tile * blockDim.x + threadIdx.x;
         if(idx < n){
@@ -26,7 +26,7 @@ __global__ void Body::compute_gravity(float* x, float* y, float* m, float* ax, f
         }
         __syncthreads();
         #pragma unroll 
-        for (int j = 0; j < 256; j++) {
+        for (int j = 0; j < MAX_THREADS_PER_BLOCK; j++) {
 
             float dx = sh_x[j] - my_x;
             float dy = sh_y[j] - my_y;
@@ -50,9 +50,9 @@ __global__ void Body::compute_electric(float* x, float* y,float* q, float* ax, f
     float q_cur = (i < n) ? q[i] : 0.0f;
     float fx = 0.0f;
     float fy = 0.0f;
-    __shared__ float sh_x[256];
-    __shared__ float sh_y[256];
-    __shared__ float sh_q[256];
+    __shared__ float sh_x[MAX_THREADS_PER_BLOCK];
+    __shared__ float sh_y[MAX_THREADS_PER_BLOCK];
+    __shared__ float sh_q[MAX_THREADS_PER_BLOCK];
     for(int tile = 0; tile < gridDim.x; tile++){
         int idx = tile * blockDim.x + threadIdx.x;
         if(idx < n){
@@ -67,21 +67,21 @@ __global__ void Body::compute_electric(float* x, float* y,float* q, float* ax, f
         }
         __syncthreads();
         #pragma unroll 
-        for (int j = 0; j < 256; j++) {
-            float qq = sh_q[j] * q_cur;
+        for (int j = 0; j < MAX_THREADS_PER_BLOCK; j++) {
+ 
             float dx = sh_x[j] - my_x;
             float dy = sh_y[j] - my_y;
             float dist_sq = dx * dx + dy * dy + soft;
             float inv_dist = rsqrtf(dist_sq);
-            float s = inv_dist * inv_dist * inv_dist ; 
-            fx += dx * s * qq;
-            fy += dy * s * qq;
+            float s = inv_dist * inv_dist * inv_dist * sh_q[j] ; 
+            fx += dx * s;
+            fy += dy * s;
         }
         __syncthreads();
     }
     if(i < n){
-        ax[i] = fx;
-        ay[i] = fy;
+        ax[i] = fx * -q_cur;
+        ay[i] = fy * -q_cur;
     }
 }
 
@@ -120,8 +120,8 @@ __global__ void Body::compute_gfield(float* x, float* y, float* m, float p_x, fl
             ly += dy * s;
 
         }
-        __shared__ float fx[256];
-        __shared__ float fy[256];
+        __shared__ float fx[MAX_THREADS_PER_BLOCK];
+        __shared__ float fy[MAX_THREADS_PER_BLOCK];
         fx[threadIdx.x] = lx;
         fy[threadIdx.x] = ly;
         __syncthreads();
@@ -147,13 +147,13 @@ __global__ void Body::compute_efield(float* x, float* y, float* q, float p_x, fl
             float dy = y[i] - p_y;
             float dist_sq = dx * dx + dy * dy + soft;
             float invdist = rsqrt(dist_sq);
-            float s = invdist * invdist * invdist * 1e-6f * q[i];
+            float s = invdist * invdist * invdist * 1e-6f * -q[i];
             lx += dx * s;
             ly += dy * s;
 
         }
-        __shared__ float fx[256];
-        __shared__ float fy[256];
+        __shared__ float fx[MAX_THREADS_PER_BLOCK];
+        __shared__ float fy[MAX_THREADS_PER_BLOCK];
         fx[threadIdx.x] = lx;
         fy[threadIdx.x] = ly;
         __syncthreads();

@@ -24,10 +24,10 @@ int renderG(const int N,const float soft)
     
     
     
-    
 
     glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
@@ -35,7 +35,7 @@ int renderG(const int N,const float soft)
 	glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glfwSetFramebufferSizeCallback(window, g_framebuffer_size_callback);
-    const int threads = 256;
+    const int threads = MAX_THREADS_PER_BLOCK;
     int blocks = (N + threads -1 )/ threads; 
     std::vector<float> x(N);
     std::vector<float> y(N);
@@ -233,7 +233,7 @@ int renderG(const int N,const float soft)
         glBindVertexArray(VAO);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
-       //std::printf("%f\n", 1.0/dt);
+        //std::printf("%f\n", 1.0/dt);
 	}
 
     return 0;
@@ -254,6 +254,8 @@ void e_framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 
 int renderE(const int N,const float soft)
 {   
+    //cudaDeviceProp prop;
+    //cudaGetDeviceProperties(&prop, 0);
     glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
@@ -263,7 +265,7 @@ int renderE(const int N,const float soft)
 	glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glfwSetFramebufferSizeCallback(window, e_framebuffer_size_callback);
-    const int threads = 256;
+    const int threads = MAX_THREADS_PER_BLOCK;
     int blocks = (N + threads -1 )/ threads; 
     std::vector<float> x(N);
     std::vector<float> y(N);
@@ -272,11 +274,16 @@ int renderE(const int N,const float soft)
     std::vector<float> vy(N);
     srand(static_cast<unsigned int>(time(nullptr)));
     for(int i =0; i < N; i++){
-        x[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
-        y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
+        //x[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
+        //y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
+        float angle = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /(3.1415926535f * 2.0f)) );
+        float rad = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
+        x[i] = rad * cos(angle);
+        y[i] = rad * sin(angle);
         vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
         vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
-        q[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f ) * 10.0f;
+        //q[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f ) * 10.0f;
+        q[i] = ((rand() % 2) * 2 -1) * 5.0f;
 
     }
     float *d_x, *d_y, *d_vx, *d_vy, *d_ax, *d_ay, *d_q, *ee;
@@ -294,7 +301,7 @@ int renderE(const int N,const float soft)
     cudaMemcpy(d_x, &x[0], N * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_y, &y[0], N * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_q, &q[0], N * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_vx, &vx[0], N * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_vx, &vx[0], N * sizeof(float), cudaMemcpyHostToDevice); 
     cudaMemcpy(d_vy, &vy[0], N * sizeof(float), cudaMemcpyHostToDevice);
     
     //cudaMemset(d_vx, 0, N * sizeof(float));
@@ -411,7 +418,7 @@ int renderE(const int N,const float soft)
 
     
     float dt = 0.0f;
-    float lastFrame = 0.0f;
+    float lastFrame = 0.0f;              
    
     while (!glfwWindowShouldClose(window)) {
         cudaMemset(ee, 0, 2 * sizeof(float));
@@ -460,6 +467,7 @@ int renderE(const int N,const float soft)
         glBindVertexArray(VAO);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
+        //std::printf("%f\n", 1/dt);
 	}
 
     return 0;

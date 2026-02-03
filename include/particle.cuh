@@ -1,6 +1,6 @@
 #ifndef particle_h
 #define particle_h
-
+#define MAX_THREADS_PER_BLOCK 512
 
 namespace Body{
  
