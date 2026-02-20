@@ -19,7 +19,7 @@ void g_framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 }
 
 
-int renderG(const int N,const float soft)
+int renderG(const int N,const float soft,const float step)
 {   
     
     
@@ -37,43 +37,32 @@ int renderG(const int N,const float soft)
     glfwSetFramebufferSizeCallback(window, g_framebuffer_size_callback);
     const int threads = MAX_THREADS_PER_BLOCK;
     int blocks = (N + threads -1 )/ threads; 
-    std::vector<float> x(N);
-    std::vector<float> y(N);
-    std::vector<float> m(N);
-    std::vector<float> vx(N);
-    std::vector<float> vy(N);
+    std::vector<particle2D> pCopy (N);
     srand(static_cast<unsigned int>(time(nullptr)));
     for(int i =0; i < N; i++){
         //x[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
         //y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
         float angle = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /(3.1415926535f * 2.0f)) );
         float rad = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
-        x[i] = rad * cos(angle);
-        y[i] = rad * sin(angle);
-        vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f) - 12.0f);
-        vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f) - 12.0f);
-        m[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f)) + 1.0f;
+        pCopy[i].x = rad * cos(angle);
+        pCopy[i].y = rad * sin(angle);
+        pCopy[i].vx = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f) - 12.0f);
+        pCopy[i].vy = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f) - 12.0f);
+        pCopy[i].mass = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f)) + 1.0f;
+        pCopy[i].ax = 0.0f;
+        pCopy[i].ay = 0.0f;
+        pCopy[i].charge = 0.0f;
+        pCopy[i].attrib = pCopy[i].mass;
     }
-    float *d_x, *d_y, *d_vx, *d_vy, *d_ax, *d_ay, *d_m, *ge;
+    float* ge;
+    cudaMalloc(&ge, 2 * sizeof(float));
+    particle2D* parts;
     float* c_g_field = (float*)std::malloc(2 * sizeof(float));
     float m_x, m_y;
     double xpos, ypos;
-    cudaMalloc(&d_x,  N * sizeof(float));
-    cudaMalloc(&d_y,  N * sizeof(float));
-    cudaMalloc(&d_vx, N * sizeof(float));
-    cudaMalloc(&d_vy, N * sizeof(float));
-    cudaMalloc(&d_ax, N * sizeof(float));
-    cudaMalloc(&d_ay, N * sizeof(float));
-    cudaMalloc(&d_m,  N * sizeof(float));
-    cudaMalloc(&ge, 2 * sizeof(float));
-    cudaMemcpy(d_x, &x[0], N * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_y, &y[0], N * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_m, &m[0], N * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_vx, &vx[0], N * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_vy, &vy[0], N * sizeof(float), cudaMemcpyHostToDevice);
     
-    cudaMemset(d_ax, 0, N * sizeof(float));
-    cudaMemset(d_ay, 0, N * sizeof(float));
+    cudaMalloc(&parts, N * sizeof(particle2D));
+    cudaMemcpy(parts, &pCopy[0], N * sizeof(particle2D), cudaMemcpyHostToDevice);
     unsigned int VAO, VBO;
     struct cudaGraphicsResource *cuda_vbo_resource;
     
@@ -109,7 +98,7 @@ int renderG(const int N,const float soft)
         "out vec3 vColor;\n"
         "void main() {\n"
         "   gl_Position = vec4(aPos, 0.0, 1.0);\n"
-        "   gl_PointSize = mass/5;\n"
+        "   gl_PointSize = mass/3;\n"
         "   vColor = aColor;\n"
         "}\0";
 
@@ -198,10 +187,10 @@ int renderG(const int N,const float soft)
         cudaGraphicsMapResources(1, &cuda_vbo_resource, 0);
         cudaGraphicsResourceGetMappedPointer((void**)&d_ptr, &size, cuda_vbo_resource);
         
-
-        Body::compute_gravity<<<blocks, threads>>>(d_x, d_y, d_m, d_ax, d_ay, N,soft);
-        Body::move<<<blocks, threads>>>(d_ptr ,d_x , d_y , d_ax, d_ay, d_vx, d_vy, N, 0.00001f,d_m); 
-        Body::compute_gfield<<<blocks, threads>>>(d_x,d_y, d_m, m_x,m_y, N, ge,soft);
+        
+        Body::compute_gravity<<<blocks, threads>>>(parts, N,soft);
+        Body::move<<<blocks, threads>>>(d_ptr ,parts, N, step); 
+        Body::compute_gfield<<<blocks, threads>>>(parts, m_x,m_y, N, ge,soft);
         line_vertices[0] = m_x;
         line_vertices[1] = m_y;
         
@@ -233,7 +222,7 @@ int renderG(const int N,const float soft)
         glBindVertexArray(VAO);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
-        //std::printf("%f\n", 1.0/dt);
+        std::printf("%f\n", 1.0/dt);
 	}
 
     return 0;
@@ -252,7 +241,8 @@ void e_framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 }
 
 
-int renderE(const int N,const float soft)
+
+int renderE(const int N,const float soft,const float step)
 {   
     //cudaDeviceProp prop;
     //cudaGetDeviceProperties(&prop, 0);
@@ -267,48 +257,34 @@ int renderE(const int N,const float soft)
     glfwSetFramebufferSizeCallback(window, e_framebuffer_size_callback);
     const int threads = MAX_THREADS_PER_BLOCK;
     int blocks = (N + threads -1 )/ threads; 
-    std::vector<float> x(N);
-    std::vector<float> y(N);
-    std::vector<float> q(N);
-    std::vector<float> vx(N);
-    std::vector<float> vy(N);
+    std::vector<particle2D> pCopy (N);
     srand(static_cast<unsigned int>(time(nullptr)));
     for(int i =0; i < N; i++){
         //x[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
         //y[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f );
         float angle = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /(3.1415926535f * 2.0f)) );
         float rad = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX));
-        x[i] = rad * cos(angle);
-        y[i] = rad * sin(angle);
-        vx[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
-        vy[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f);
-        //q[i] = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /2.0f) - 1.0f ) * 10.0f;
-        q[i] = ((rand() % 2) * 2 -1) * 5.0f;
-
+        pCopy[i].x = rad * cos(angle);
+        pCopy[i].y = rad * sin(angle);
+        pCopy[i].vx = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f) - 12.0f);
+        pCopy[i].vy = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f) - 12.0f);
+        pCopy[i].mass = (static_cast <float> (rand()) / static_cast <float> (RAND_MAX /24.0f)) + 1.0f;
+        pCopy[i].ax = 0.0f;
+        pCopy[i].ay = 0.0f;
+        pCopy[i].charge = ((rand() % 2) * 2 -1) * 5.0f;
+        pCopy[i].attrib = pCopy[i].charge;
     }
-    float *d_x, *d_y, *d_vx, *d_vy, *d_ax, *d_ay, *d_q, *ee;
+    float* ee;
+    cudaMalloc(&ee, 2 * sizeof(float));
+    particle2D* parts;
     float* c_e_field = (float*)std::malloc(2 * sizeof(float));
     float m_x, m_y;
     double xpos, ypos;
-    cudaMalloc(&d_x,  N * sizeof(float));
-    cudaMalloc(&d_y,  N * sizeof(float));
-    cudaMalloc(&d_vx, N * sizeof(float));
-    cudaMalloc(&d_vy, N * sizeof(float));
-    cudaMalloc(&d_ax, N * sizeof(float));
-    cudaMalloc(&d_ay, N * sizeof(float));
-    cudaMalloc(&d_q,  N * sizeof(float));
-    cudaMalloc(&ee, 2 * sizeof(float));
-    cudaMemcpy(d_x, &x[0], N * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_y, &y[0], N * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_q, &q[0], N * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_vx, &vx[0], N * sizeof(float), cudaMemcpyHostToDevice); 
-    cudaMemcpy(d_vy, &vy[0], N * sizeof(float), cudaMemcpyHostToDevice);
     
-    //cudaMemset(d_vx, 0, N * sizeof(float));
-    //cudaMemset(d_vy, 0, N * sizeof(float));
-    cudaMemset(d_ax, 0, N * sizeof(float));
-    cudaMemset(d_ay, 0, N * sizeof(float));
-    unsigned int VAO, VBO;
+    cudaMalloc(&parts, N * sizeof(particle2D));
+    cudaMemcpy(parts, &pCopy[0], N * sizeof(particle2D), cudaMemcpyHostToDevice);
+
+    unsigned int VBO, VAO;
     struct cudaGraphicsResource *cuda_vbo_resource;
     
     // Create OpenGL Buffer
@@ -324,7 +300,6 @@ int renderE(const int N,const float soft)
 
     
     // Attribute 0: Position (x, y)
-    // Stride is 5 * sizeof(float) because each particle's data repeats every 5 floats
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
@@ -409,14 +384,7 @@ int renderE(const int N,const float soft)
     glBindVertexArray(lineVAO);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    int lineColorLoc = glGetUniformLocation(lineShader,"color");
-
-
-
-
-
-
-    
+    int lineColorLoc = glGetUniformLocation(lineShader,"color");    
     float dt = 0.0f;
     float lastFrame = 0.0f;              
    
@@ -433,9 +401,9 @@ int renderE(const int N,const float soft)
         cudaGraphicsResourceGetMappedPointer((void**)&d_ptr, &size, cuda_vbo_resource);
         
 
-        Body::compute_electric<<<blocks, threads>>>(d_x, d_y, d_q, d_ax, d_ay, N,soft);
-        Body::move<<<blocks, threads>>>(d_ptr ,d_x , d_y , d_ax, d_ay, d_vx, d_vy, N, 0.00001f,d_q); 
-        Body::compute_efield<<<blocks, threads>>>(d_x,d_y, d_q, m_x,m_y, N, ee,soft);
+        Body::compute_electric<<<blocks, threads>>>(parts, N,soft);
+        Body::move<<<blocks, threads>>>(d_ptr,parts, N, step); 
+        Body::compute_efield<<<blocks, threads>>>(parts, m_x,m_y, N, ee,soft);
         line_vertices[0] = m_x;
         line_vertices[1] = m_y;
         

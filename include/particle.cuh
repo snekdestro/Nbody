@@ -1,14 +1,46 @@
-#ifndef particle_h
-#define particle_h
+#ifndef particle_cuh
+#define particle_cuh
 #define MAX_THREADS_PER_BLOCK 512
+
+
+typedef struct{
+    float x;
+    float y;
+    float z;
+    float ax;
+    float ay;
+    float az;
+    float vx;
+    float vy;
+    float vz;
+    float mass;
+    float charge;
+
+} particle3D;
+
+typedef struct{
+    float x;
+    float y;
+    float ax;
+    float ay;
+    float vx;
+    float vy;
+    float mass;
+    float charge;
+    float attrib;
+}particle2D;
+
 
 namespace Body{
  
-__global__ void compute_gravity(float* x, float* y, float* m, float* ax, float* ay, int n,float soft);
-__global__ void move(float* d_ptr,float* x, float* y, float* ax, float* ay, float* vx, float* vy, int n, float dt,float* attrib); 
-__global__ void compute_electric(float* x, float* y, float* q, float* ax, float* ay, int n,float soft);
-__global__ void compute_gfield(float* x, float* y, float* m, float p_x, float p_y, int n, float* output,float soft);
-__global__ void compute_efield(float* x, float* y, float* q, float p_x, float p_y, int n, float* output,float soft);
+__global__ void compute_gravity(particle2D* parts, int n,float soft);
+__global__ void move(float* d_ptr,particle2D* parts, int n, float dt); 
+__global__ void compute_electric(particle2D* parts, int n,float soft);
+__global__ void compute_gfield(particle2D* parts, float p_x, float p_y, int n, float* output,float soft);
+__global__ void compute_efield(particle2D* parts, float p_x, float p_y, int n, float* output,float soft);
+__global__ void compute_gravity3D(particle3D* parts, int n,float soft);
+__global__ void move(float* d_ptr,particle3D* parts,int n, float dt,float); 
+
 }
 
 #endif
